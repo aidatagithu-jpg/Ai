@@ -9,9 +9,10 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 # --- സെറ്റിംഗ്സ് ---
 GEMINI_API_KEY = "AIzaSyBS31EaBWBCno_iEp2jr-URnzcvJ2_ZHDQ"
 TELEGRAM_BOT_TOKEN = "8667254663:AAED7HDnMEYodIDqy-u7Z_7ffok4POicySQ"
-GITHUB_TOKEN = "ghp_11CBUMCGI0eZQb8w0fykw4_1xSQECEePyGbDkOB7FMCGXIcnfEwH2uwwMEG8Woh62vGSXYLLV7bYSgwLsN"
-# നിങ്ങളുടെ യൂസർനെയിമും റിപ്പോസിറ്ററി പേരും താഴെ നൽകുക
-REPO_NAME = "Risham004/A-One-Bot" 
+# നിങ്ങളുടെ പുതിയ ടോക്കൺ ഇവിടെ നൽകുന്നു
+GITHUB_TOKEN = "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"
+# യൂസർനെയിമും റിപ്പോസിറ്ററിയും കൃത്യമാണെന്ന് ഉറപ്പാക്കുക
+REPO_NAME = "Aidatagithu-jpg/Ai" 
 
 # GitHub കണക്ഷൻ
 try:
@@ -40,25 +41,32 @@ def run_health_check():
 
 def get_data_from_github():
     try:
+        # data.txt വായിക്കുന്നു
         contents = repo.get_contents("data.txt")
         return contents.decoded_content.decode("utf-8")
-    except:
+    except Exception as e:
+        print(f"Read Error: {e}")
         return ""
 
 def save_to_github(new_text):
     try:
-        contents = repo.get_contents("data.txt")
-        old_data = contents.decoded_content.decode("utf-8")
-        updated_data = old_data + "\n" + new_text
-        repo.update_file(contents.path, "Bot updated data", updated_data, contents.sha)
+        file_path = "data.txt"
+        try:
+            # നിലവിലുള്ള ഫയൽ എടുക്കുന്നു
+            contents = repo.get_contents(file_path)
+            old_data = contents.decoded_content.decode("utf-8")
+            updated_data = old_data + "\n" + new_text
+            repo.update_file(contents.path, "Bot updated data", updated_data, contents.sha)
+        except:
+            # ഫയൽ ഇല്ലെങ്കിൽ പുതിയത് ഉണ്ടാക്കുന്നു
+            repo.create_file(file_path, "Initial commit", new_text)
         return True
-    except:
-        # ഫയൽ ഇല്ലെങ്കിൽ പുതിയത് ഉണ്ടാക്കുന്നു
-        repo.create_file("data.txt", "Initial commit", new_text)
-        return True
+    except Exception as e:
+        print(f"Save Error: {e}")
+        return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ഹലോ റിഷാം! എ വൺ മ്യൂസിക് ബോട്ട് റെഡിയാണ്.")
+    await update.message.reply_text("ഹലോ റിഷാം! ഗിറ്റ്‌ഹബ്ബ് ഡാറ്റാബേസ് ബോട്ട് റെഡിയാണ്.")
 
 async def add_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_to_add = " ".join(context.args)
@@ -66,27 +74,32 @@ async def add_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("/add [വിവരം] നൽകുക")
         return
     
-    msg = await update.message.reply_text("GitHub-ലേക്ക് സേവ് ചെയ്യുന്നു... ⏳")
+    msg = await update.message.reply_text("GitHub-ലേക്ക് മാറ്റങ്ങൾ വരുത്തുന്നു... ⏳")
     if save_to_github(text_to_add):
-        await msg.edit_text("വിവരം സ്ഥിരമായി സേവ് ചെയ്തു! ✅")
+        await msg.edit_text(f"'{text_to_add}' എന്നത് ഗിറ്റ്‌ഹബ്ബിൽ സേവ് ചെയ്തു! ✅")
+    else:
+        await msg.edit_text("സേവ് ചെയ്യാൻ പറ്റിയില്ല. ടോക്കൺ പെർമിഷനോ റിപ്പോസിറ്ററി പേരോ ഒന്ന് നോക്കൂ.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_query = update.message.text
     content = get_data_from_github()
     
-    prompt = f"നീ റിഷാമിന്റെ അസിസ്റ്റന്റ് ആണ്. താഴെ പറയുന്ന വിവരങ്ങൾ ഉപയോഗിച്ച് മറുപടി നൽകുക:\n\n{content}\n\nചോദ്യം: {user_query}"
+    # ഡാറ്റ ഉണ്ടെങ്കിൽ അത് പ്രോംപ്റ്റിൽ ചേർക്കുന്നു
+    prompt = f"നീ റിഷാമിന്റെ അസിസ്റ്റന്റ് ആണ്. താഴെ പറയുന്ന വിവരങ്ങൾ ഉപയോഗിച്ച് മാത്രം മറുപടി നൽകുക:\n\n{content}\n\nചോദ്യം: {user_query}"
     
     try:
         response = model.generate_content(prompt)
         await update.message.reply_text(response.text)
     except:
-        await update.message.reply_text("ക്ഷമിക്കണം, മറുപടി നൽകാൻ പറ്റിയില്ല.")
+        await update.message.reply_text("മറുപടി നൽകാൻ കഴിഞ്ഞില്ല. ജെമിനി കീ ശരിയാണോ എന്ന് നോക്കൂ.")
 
 if __name__ == '__main__':
     threading.Thread(target=run_health_check, daemon=True).start()
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add", add_data))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    
     print("ബോട്ട് ലോഡ് ആയി...")
     app.run_polling()
