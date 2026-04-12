@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # --- 1. സെറ്റിംഗ്സ് ---
 GEMINI_API_KEY = "AIzaSyBS31EaBWBCno_iEp2jr-URnzcvJ2_ZHDQ"
-TELEGRAM_BOT_TOKEN = "8667254663:AAG0FX81zxuieZSvGbetvRhGHMmU0O1oauA"
+TELEGRAM_BOT_TOKEN = "8667254663:AAHOmNXAzwz0jzlF9ZaGDhsmAN_JthVeM8M"
 # നിങ്ങളുടെ പുതിയ ടോക്കൺ
 GITHUB_TOKEN = "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"
 # നിങ്ങൾ പറഞ്ഞ ശരിയായ റിപ്പോസിറ്ററി പേര്
