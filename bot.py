@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 # --- 1. സെറ്റിംഗ്സ് ---
 # നിങ്ങളുടെ പുതിയ ടെലിഗ്രാം ബോട്ട് ടോക്കൺ ഇവിടെ നൽകി
 TELEGRAM_BOT_TOKEN = "8667254663:AAEOFGclaisKrfHGoVQUTgPE1ojU1WfDJUo"
-GEMINI_API_KEY = "AIzaSyBS31EaBWBCno_iEp2jr-URnzcvJ2_ZHDQ"
+GEMINI_API_KEY = "AIzaSyBzML2i4oW-CuAJ3ZYCqbQHq0fZeAxUX2s"
 
 # Render Environment Variable-ൽ നിന്ന് ടോക്കൺ എടുക്കുന്നു
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
