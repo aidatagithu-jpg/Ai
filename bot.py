@@ -1,24 +1,29 @@
 import os
-import google.generativeai as genai
-from github import Github
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 1. സെറ്റിംഗ്സ് ---
-# നിങ്ങളുടെ പുതിയ ടെലിഗ്രാം ബോട്ട് ടോക്കൺ ഇവിടെ നൽകി
-TELEGRAM_BOT_TOKEN = "8667254663:AAEURX4wT1eZgedvEyj_T3GZHXadWLM9gDo"
+# ലൈബ്രറികൾ ഇംപോർട്ട് ചെയ്യുന്നു
+try:
+    import google.generativeai as genai
+    from github import Github
+    from telegram import Update
+    from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
+except ImportError:
+    print("Error: ആവശ്യമായ ലൈബ്രറികൾ ഇൻസ്റ്റാൾ ചെയ്തിട്ടില്ല!")
+
+# --- 1. കോൺഫിഗറേഷൻ ---
+TELEGRAM_BOT_TOKEN = "8667254663:AAFB1Ns9yivnoLkaInSe7g_461BtywSC1pM"
 GEMINI_API_KEY = "AIzaSyBzML2i4oW-CuAJ3ZYCqbQHq0fZeAxUX2s"
 
-# Render Environment Variable-ൽ നിന്ന് ടോക്കൺ എടുക്കുന്നു
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+# Render-ൽ സെറ്റ് ചെയ്ത ടോക്കൺ ഇവിടെ എടുക്കുന്നു
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") 
 REPO_NAME = "aidatagithu-jpg/Ai"
 
 # ഗ്ലോബൽ വേരിയബിൾ
 repo = None
 
-# --- 2. GitHub കണക്ഷൻ ഫംഗ്ഷൻ ---
+# --- 2. കണക്ഷനുകൾ ---
+
 def connect_github():
     global repo
     try:
@@ -28,20 +33,20 @@ def connect_github():
             print(f"GitHub Connected to {REPO_NAME} ✅")
             return True
         else:
-            print("Error: GITHUB_TOKEN not found in Render Environment!")
+            print("GITHUB_TOKEN കണ്ടെത്തിയില്ല! Render settings പരിശോധിക്കുക.")
             return False
     except Exception as e:
-        repo = None
-        print(f"GitHub Connection Failed: {e}")
+        print(f"GitHub Connection Error: {e}")
         return False
 
-# തുടക്കത്തിൽ തന്നെ കണക്ട് ചെയ്യാൻ ശ്രമിക്കുന്നു
+# തുടക്കത്തിൽ തന്നെ കണക്ട് ചെയ്യുന്നു
 connect_github()
 
+# Gemini 2.0 Flash സെറ്റപ്പ്
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.0-flash')
 
-# --- 3. Render Health Check (Web Service) ---
+# --- 3. Render Health Check (Web Server) ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -55,7 +60,7 @@ def run_health_check():
 
 # --- 4. ഡാറ്റാബേസ് ഫംഗ്ഷനുകൾ ---
 
-def get_data():
+def get_stored_data():
     global repo
     if repo is None: connect_github()
     try:
@@ -64,71 +69,71 @@ def get_data():
     except:
         return ""
 
-def save_data(text):
+def save_to_github(text):
     global repo
     if repo is None:
-        if not connect_github():
-            return False, "GitHub Connection not established"
+        if not connect_github(): return False, "GitHub Connection Failed"
     
     file_path = "data.txt"
     try:
         try:
-            # ഫയൽ ഉണ്ടെങ്കിൽ അപ്‌ഡേറ്റ് ചെയ്യുന്നു
+            # നിലവിലുള്ള ഡാറ്റയിലേക്ക് പുതിയത് ചേർക്കുന്നു
             contents = repo.get_contents(file_path)
             old_data = contents.decoded_content.decode("utf-8")
             new_data = old_data + "\n" + text
-            repo.update_file(contents.path, "bot_update", new_data, contents.sha)
+            repo.update_file(contents.path, "update_bot", new_data, contents.sha)
         except:
-            # ഫയൽ ഇല്ലെങ്കിൽ പുതിയത് ഉണ്ടാക്കുന്നു
-            repo.create_file(file_path, "bot_create", text)
+            # ഫയൽ ഇല്ലെങ്കിൽ പുതിയത് നിർമ്മിക്കുന്നു
+            repo.create_file(file_path, "create_bot", text)
         return True, "Success"
     except Exception as e:
         return False, str(e)
 
-# --- 5. ബോട്ട് കമാൻഡുകൾ ---
+# --- 5. ബോട്ട് കമാൻഡ് ഹാൻഡ്ലേഴ്സ് ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ഹലോ! പുതിയ ടോക്കൺ സെറ്റപ്പ് പൂർത്തിയായി. /add [വിവരം] ഉപയോഗിച്ച് ഡാറ്റ ചേർക്കാം.")
+    await update.message.reply_text("ഹലോ റിഷാം! എ വൺ മ്യൂസിക് ബോട്ട് (Gemini 2.0 Flash) റെഡിയാണ്.\n\nവിവരങ്ങൾ ചേർക്കാൻ /add [text] എന്ന് ഉപയോഗിക്കുക.")
 
-async def add_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    val = " ".join(context.args)
-    if not val:
-        await update.message.reply_text("സേവ് ചെയ്യാൻ /add കഴിഞ്ഞു വിവരം ടൈപ്പ് ചെയ്യുക.")
+async def add_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data = " ".join(context.args)
+    if not user_data:
+        await update.message.reply_text("സേവ് ചെയ്യേണ്ട വിവരങ്ങൾ നൽകുക. ഉദാഹരണം: /add സംശയങ്ങൾക്ക് റിഷാമിനെ വിളിക്കുക")
         return
     
-    msg = await update.message.reply_text("GitHub-ലേക്ക് സേവ് ചെയ്യുന്നു... ⏳")
-    status, error_msg = save_data(val)
+    status_msg = await update.message.reply_text("സേവ് ചെയ്യുന്നു... ⏳")
+    success, msg = save_to_github(user_data)
     
-    if status:
-        await msg.edit_text(f"സേവ് ചെയ്തു! ✅\nData: {val}")
+    if success:
+        await status_msg.edit_text(f"വിജയകരമായി സേവ് ചെയ്തു ✅\nData: {user_data}")
     else:
-        # ഇവിടെ കൃത്യമായ എറർ മെസ്സേജ് കാണിക്കും
-        await msg.edit_text(f"സേവ് ചെയ്യാൻ പറ്റിയില്ല ❌\nError: {error_msg}")
+        await status_msg.edit_text(f"സേവ് ചെയ്യാൻ പറ്റിയില്ല ❌\nError: {msg}")
 
-async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_text = update.message.text
-    stored_data = get_data()
+async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_input = update.message.text
+    db_data = get_stored_data()
     
-    # ഡാറ്റ ഉണ്ടെങ്കിൽ അത് അസിസ്റ്റന്റിന് നൽകുന്നു
-    prompt = f"നീ റിഷാമിന്റെ അസിസ്റ്റന്റ് ആണ്. ഈ ഡാറ്റ ഉപയോഗിച്ച് മറുപടി നൽകുക: {stored_data}\n\nUser Question: {user_text}"
+    # പ്രോംപ്റ്റ് സെറ്റിംഗ്സ്
+    prompt = f"നീ റിഷാമിന്റെ അസിസ്റ്റന്റ് ആണ്. താഴെ നൽകിയിരിക്കുന്ന ഡാറ്റ ഉപയോഗിച്ച് മറുപടി നൽകുക: {db_data}\n\nUser Question: {user_input}"
     
     try:
         response = model.generate_content(prompt)
         await update.message.reply_text(response.text)
-    except:
-        await update.message.reply_text("ജെമിനി ഇപ്പോൾ ലഭ്യമല്ല.")
+    except Exception as e:
+        await update.message.reply_text(f"ജെമിനി ഇപ്പോൾ ലഭ്യമല്ല. എറർ: {str(e)}")
 
-# --- 6. ബോട്ട് ലോഞ്ചിംഗ് ---
+# --- 6. ബോട്ട് റൺ ചെയ്യുന്നു ---
 
 if __name__ == '__main__':
-    # Render-ന് വേണ്ടി വെബ് സെർവർ സ്റ്റാർട്ട് ചെയ്യുന്നു
+    # Render-ന് വേണ്ടി വെബ് സെർവർ ബാക്ക്ഗ്രൗണ്ടിൽ റൺ ചെയ്യുന്നു
     threading.Thread(target=run_health_check, daemon=True).start()
     
+    # ബോട്ട് ആപ്ലിക്കേഷൻ സെറ്റപ്പ്
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     
+    # കമാൻഡുകൾ ആഡ് ചെയ്യുന്നു
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("add", add_data))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_chat))
+    app.add_handler(CommandHandler("add", add_info))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat_handler))
     
     print("Bot is Polling...")
     app.run_polling()
