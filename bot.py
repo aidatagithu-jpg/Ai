@@ -6,26 +6,24 @@ from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, Comma
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 1. സെറ്റിംഗ്സ് ---
+# --- സെറ്റിംഗ്സ് ---
 GEMINI_API_KEY = "AIzaSyBS31EaBWBCno_iEp2jr-URnzcvJ2_ZHDQ"
-TELEGRAM_BOT_TOKEN = "8667254663:AAHOmNXAzwz0jzlF9ZaGDhsmAN_JthVeM8M"
-# നിങ്ങളുടെ പുതിയ ടോക്കൺ
+TELEGRAM_BOT_TOKEN = "8667254663:AAGrWr-lA7X-XXeQpFalF0FohhPT1jo7_Lw"
 GITHUB_TOKEN = "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"
-# നിങ്ങൾ പറഞ്ഞ ശരിയായ റിപ്പോസിറ്ററി പേര്
 REPO_NAME = "aidatagithu-jpg/Ai" 
 
-# --- 2. കണക്ഷൻ സെറ്റപ്പ് ---
+# GitHub കണക്ഷൻ
 try:
     g = Github(GITHUB_TOKEN)
     repo = g.get_repo(REPO_NAME)
-    print("GitHub കണക്ട് ആയി! ✅")
+    print("GitHub Connected! ✅")
 except Exception as e:
-    print(f"GitHub Connection Error: {e}")
+    print(f"GitHub Auth Error: {e}")
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- 3. വെബ് സെർവർ (Render Web Service-ന് വേണ്ടി) ---
+# Render Health Check
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -37,76 +35,55 @@ def run_health_check():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# --- 4. GitHub ഡാറ്റാബേസ് ഫംഗ്ഷനുകൾ ---
+# --- ഫംഗ്ഷനുകൾ ---
 
-def get_data_from_github():
+def get_info():
     try:
         contents = repo.get_contents("data.txt")
         return contents.decoded_content.decode("utf-8")
-    except Exception as e:
-        print(f"Read Error: {e}")
+    except:
         return ""
 
-def save_to_github(new_text):
-    file_path = "data.txt"
+def save_info(text):
     try:
+        file_path = "data.txt"
         try:
-            # നിലവിലുള്ള ഫയൽ അപ്‌ഡേറ്റ് ചെയ്യുന്നു
             contents = repo.get_contents(file_path)
             old_data = contents.decoded_content.decode("utf-8")
-            updated_data = old_data + "\n" + new_text
-            repo.update_file(contents.path, "Bot updated data", updated_data, contents.sha)
+            new_data = old_data + "\n" + text
+            repo.update_file(contents.path, "update", new_data, contents.sha)
         except:
-            # ഫയൽ ഇല്ലെങ്കിൽ പുതിയത് ഉണ്ടാക്കുന്നു
-            repo.create_file(file_path, "Initial commit", new_text)
-        return True
+            repo.create_file(file_path, "create", text)
+        return True, "Success"
     except Exception as e:
-        print(f"Save Error: {e}")
-        return False
+        return False, str(e)
 
-# --- 5. ബോട്ട് കമാൻഡുകൾ ---
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ഹലോ റിഷാം! എ വൺ മ്യൂസിക് ബോട്ട് ഇപ്പോൾ ഗിറ്റ്‌ഹബ്ബ് വഴി ഡാറ്റ സേവ് ചെയ്യാൻ റെഡിയാണ്.")
-
-async def add_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text_to_add = " ".join(context.args)
-    if not text_to_add:
-        await update.message.reply_text("വിവരം ചേർക്കാൻ /add [വിവരം] എന്ന് ടൈപ്പ് ചെയ്യുക.")
+async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    val = " ".join(context.args)
+    if not val:
+        await update.message.reply_text("/add [വിവരം] നൽകുക")
         return
     
-    msg = await update.message.reply_text("GitHub-ലേക്ക് സേവ് ചെയ്യുന്നു... ⏳")
-    if save_to_github(text_to_add):
-        await msg.edit_text(f"വിവരം വിജയകരമായി പഠിച്ചു! ✅\n\nസേവ് ചെയ്തത്: {text_to_add}")
+    status, msg = save_info(val)
+    if status:
+        await update.message.reply_text(f"സേവ് ചെയ്തു ✅: {val}")
     else:
-        await msg.edit_text("ക്ഷമിക്കണം, ഡാറ്റ സേവ് ചെയ്യാൻ കഴിഞ്ഞില്ല. ലോഗ്സ് പരിശോധിക്കുക.")
+        # ഇവിടെ കൃത്യമായ എറർ മെസ്സേജ് കാണിക്കും
+        await update.message.reply_text(f"സേവ് ചെയ്യാൻ പറ്റിയില്ല ❌\nകാരണം: {msg}")
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_query = update.message.text
-    # GitHub-ൽ നിന്ന് വിവരങ്ങൾ എടുക്കുന്നു
-    stored_info = get_data_from_github()
-    
-    prompt = f"നീ റിഷാമിന്റെ അസിസ്റ്റന്റ് ആണ്. താഴെ നൽകിയിട്ടുള്ള വിവരങ്ങൾ മാത്രം ഉപയോഗിച്ച് ചോദ്യങ്ങൾക്ക് മറുപടി നൽകുക. വിവരം ലഭ്യമല്ലെങ്കിൽ എനിക്കറിയില്ല എന്ന് പറയുക:\n\n{stored_info}\n\nചോദ്യം: {user_query}"
-    
+async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    txt = update.message.text
+    data = get_info()
+    prompt = f"Data: {data}\n\nUser: {txt}"
     try:
-        response = model.generate_content(prompt)
-        await update.message.reply_text(response.text)
-    except Exception as e:
-        print(f"Gemini Error: {e}")
-        await update.message.reply_text("മറുപടി നൽകാൻ എനിക്ക് ഇപ്പോൾ സാധിക്കുന്നില്ല.")
-
-# --- 6. മെയിൻ ഫംഗ്ഷൻ ---
+        res = model.generate_content(prompt)
+        await update.message.reply_text(res.text)
+    except:
+        await update.message.reply_text("Gemini Error!")
 
 if __name__ == '__main__':
-    # Render-ന് വേണ്ടിയുള്ള വെബ് സർവർ ബാക്ക്ഗ്രൗണ്ടിൽ റൺ ചെയ്യുന്നു
     threading.Thread(target=run_health_check, daemon=True).start()
-    
-    # ബോട്ട് ആപ്ലിക്കേഷൻ സെറ്റപ്പ്
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("add", add_data))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    
-    print("ബോട്ട് പ്രവർത്തിച്ചു തുടങ്ങി...")
+    app.add_handler(CommandHandler("add", add))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat))
     app.run_polling()
