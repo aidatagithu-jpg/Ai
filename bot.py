@@ -12,7 +12,7 @@ TELEGRAM_BOT_TOKEN = "8667254663:AAG0FX81zxuieZSvGbetvRhGHMmU0O1oauA"
 # നിങ്ങളുടെ പുതിയ ടോക്കൺ
 GITHUB_TOKEN = "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"
 # നിങ്ങൾ പറഞ്ഞ ശരിയായ റിപ്പോസിറ്ററി പേര്
-REPO_NAME = "aidatagithub-jpg/Ai" 
+REPO_NAME = "aidatagithu-jpg/Ai" 
 
 # --- 2. കണക്ഷൻ സെറ്റപ്പ് ---
 try:
