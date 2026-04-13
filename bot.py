@@ -7,9 +7,9 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
 
 # --- 1. CONFIGURATION ---
-TELEGRAM_BOT_TOKEN = "8667254663:AAGdnEAseoe3k4N4gj5Nz_rHjFKmzfI6b1g"
+TELEGRAM_BOT_TOKEN = "8667254663:AAF30w1HLzLtmpeqWqjmWl7wVEf5vuOlnTA"
 HF_TOKEN = "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"
-API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3.1-8B-Instruct"
+API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") 
 REPO_NAME = "aidatagithu-jpg/Ai"
