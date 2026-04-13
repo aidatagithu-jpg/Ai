@@ -1,59 +1,37 @@
 import os
 import threading
+import requests
 from http.server import BaseHTTPRequestHandler, HTTPServer
-
-# ലൈബ്രറികൾ ഇംപോർട്ട് ചെയ്യുന്നു
-try:
-    from groq import Groq
-    from github import Github
-    from telegram import Update
-    from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
-except ImportError:
-    print("Error: ആവശ്യമായ ലൈബ്രറികൾ ഇൻസ്റ്റാൾ ചെയ്തിട്ടില്ല!")
+from github import Github
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
 
 # --- 1. കോൺഫിഗറേഷൻ ---
-TELEGRAM_BOT_TOKEN = "8667254663:AAHhMj4xanwUej6jv1a_J7z3dK-TZj7JQ78"
-GROQ_API_KEY = "gsk_9PA1BYon?51GSmkXqS5rWGdyb3FYr4dHqRzrAZGFuGjpMyPihONv" # സുരക്ഷയ്ക്കായി കീ ശരിയാണോ എന്ന് പരിശോധിക്കുക
+TELEGRAM_BOT_TOKEN = "8667254663:AAHn5yjPzs948JkUeDtci_hMiC62LXSh-Rg"
+HF_TOKEN = "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"
+# കൂടുതൽ മികച്ച Llama 3.1 8B മോഡൽ
+API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3.1-8B-Instruct"
 
-# Render-ൽ സെറ്റ് ചെയ്ത GitHub ടോക്കൺ
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") 
 REPO_NAME = "aidatagithu-jpg/Ai"
 
-# ഗ്ലോബൽ വേരിയബിൾസ്
 repo = None
-client = Groq(api_key=GROQ_API_KEY)
 
 # --- 2. കണക്ഷനുകൾ ---
-
 def connect_github():
     global repo
     try:
         if GITHUB_TOKEN:
             g = Github(GITHUB_TOKEN)
             repo = g.get_repo(REPO_NAME)
-            print("GitHub Connected ✅")
             return True
         return False
-    except Exception as e:
-        print(f"GitHub Error: {e}")
+    except:
         return False
 
 connect_github()
 
-# --- 3. Render Health Check ---
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"A One AI is Running and Learning")
-
-def run_health_check():
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
-    server.serve_forever()
-
-# --- 4. ഡാറ്റാബേസ് ഫംഗ്ഷനുകൾ ---
-
+# --- 3. ഡാറ്റാബേസ് ഫംഗ്ഷനുകൾ ---
 def get_stored_data():
     global repo
     if repo is None: connect_github()
@@ -63,75 +41,69 @@ def get_stored_data():
     except:
         return ""
 
-def save_to_github(text):
-    global repo
-    if repo is None: connect_github()
-    try:
-        file_path = "data.txt"
-        try:
-            contents = repo.get_contents(file_path)
-            old_data = contents.decoded_content.decode("utf-8")
-            # പുതിയ ഡാറ്റ താഴെ ചേർക്കുന്നു
-            new_content = old_data + "\n" + text
-            repo.update_file(contents.path, "bot_learning_update", new_content, contents.sha)
-        except:
-            repo.create_file(file_path, "bot_init_data", text)
-        return True, "Success"
-    except Exception as e:
-        return False, str(e)
-
-# --- 5. ബോട്ട് കമാൻഡുകൾ ---
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ഹലോ റിഷാം! ഞാൻ A One AI. എനിക്ക് നൽകിയ ഡാറ്റ നോക്കി മറുപടി നൽകാൻ ഞാൻ ഇപ്പോൾ കൂടുതൽ ശ്രദ്ധിക്കും. ⚡")
-
-async def add_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_data = " ".join(context.args)
-    if not user_data:
-        await update.message.reply_text("വിവരങ്ങൾ ചേർക്കാൻ /add [വിവരം] എന്ന് നൽകുക.")
-        return
+# --- 4. പ്രൊഫഷണൽ AI ലോജിക് ---
+def get_ai_response(user_input, context_data, user_name):
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     
-    success, msg = save_to_github(user_data)
-    if success:
-        await update.message.reply_text("ഈ വിവരം ഞാൻ പഠിച്ചു കഴിഞ്ഞു. ഇനി ഇതിനെക്കുറിച്ച് ചോദിക്കാം ✅")
-    else:
-        await update.message.reply_text(f"എറർ: {msg}")
+    # പ്രൊഫഷണൽ സിസ്റ്റം ഇൻസ്ട്രക്ഷൻ
+    system_prompt = (
+        f"You are A One AI, a professional multilingual assistant developed by Risham. "
+        f"Respond in the same language the user uses. Be helpful, polite, and accurate. "
+        f"Use the following knowledge base if relevant: {context_data}"
+    )
+    
+    prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+    
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 800, 
+            "temperature": 0.4, # സംഭാഷണം കൂടുതൽ സ്വാഭാവികമാക്കാൻ
+            "top_p": 0.9,
+            "return_full_text": False
+        }
+    }
+    
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        if response.status_code == 200:
+            return response.json()[0]['generated_text']
+        elif response.status_code == 503: # മോഡൽ ലോഡ് ആകുന്നുണ്ടെങ്കിൽ
+            return "AI is warming up. Please try again in 10 seconds."
+        else:
+            return "I am experiencing some technical difficulties. Please try again later."
+    except:
+        return "Connection error. Please check your internet."
+
+# --- 5. ബോട്ട് ഹാൻഡ്‌ലേഴ്‌സ് ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    welcome_text = (
+        "👋 Welcome to **A One AI**!\n\n"
+        "I am your professional assistant, capable of understanding multiple languages. "
+        "How can I help you today?\n\n"
+        "Developed by **Risham**."
+    )
+    await update.message.reply_text(welcome_text, parse_mode='Markdown')
 
 async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
-    db_data = get_stored_data()
+    user_name = update.effective_user.first_name
     
-    # ഫയലിലെ ഏറ്റവും പുതിയ 5000 അക്ഷരങ്ങൾ എടുക്കുന്നു (അവസാനത്തെ മാറ്റങ്ങൾക്കാണ് മുൻഗണന)
-    limit_data = db_data[-5000:] if len(db_data) > 5000 else db_data
-
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system", 
-                    "content": f"നിന്റെ പേര് A One AI. നീ റിഷാമിന്റെ (Risham) പേഴ്സണൽ അസിസ്റ്റന്റ് ആണ്. മലയാളത്തിൽ മറുപടി നൽകുക. താഴെ നൽകിയിരിക്കുന്ന ഡാറ്റയ്ക്ക് ഏറ്റവും ഉയർന്ന മുൻഗണന നൽകുക. ചോദ്യത്തിനുള്ള ഉത്തരം ഈ ഡാറ്റയിൽ ഉണ്ടെങ്കിൽ അത് മാത്രം പറയുക. ഡാറ്റ: {limit_data}"
-                },
-                {
-                    "role": "user", 
-                    "content": user_input
-                }
-            ],
-            model="llama-3.1-8b-instant",
-            temperature=0.1, # AI-യുടെ സ്വന്തം ഭാവന കുറയ്ക്കാൻ 0.1 ആക്കി
-        )
-        await update.message.reply_text(chat_completion.choices[0].message.content)
-    except Exception as e:
-        await update.message.reply_text(f"ക്ഷമിക്കണം, ഒരു എറർ വന്നു: {str(e)}")
+    # ടൈപ്പിംഗ് സ്റ്റാറ്റസ് കാണിക്കാൻ
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    
+    db_data = get_stored_data()
+    limit_data = db_data[-3000:] if len(db_data) > 3000 else db_data
+    
+    reply = get_ai_response(user_input, limit_data, user_name)
+    await update.message.reply_text(reply)
 
 # --- 6. റൺ ബോട്ട് ---
-
 if __name__ == '__main__':
-    threading.Thread(target=run_health_check, daemon=True).start()
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("add", add_info))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat_handler))
     
-    print("A One AI is Running...")
+    print("A One AI Professional is Live...")
     app.run_polling()
